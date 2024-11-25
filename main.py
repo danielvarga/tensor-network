@@ -168,13 +168,45 @@ def training():
     model = TensorNetworkVectorToMatrix(d, k).to(torch_device)
     print(f"Total number of parameters: {count_parameters(model)}")
 
-    xs = np.load("xs.full.npy")
-    ys = np.load("ys.full.npy")
+    # xs = np.load("xs.npy") ; ys = np.load("ys.npy")
+    xs = np.load("xs.full.npy") ; ys = np.load("ys.full.npy")
     print("dataset read")
     xs = torch.Tensor(xs).to(torch_device)
     ys = torch.Tensor(ys).to(torch_device)
 
-    train_tensor_network_vector_to_matrix(model, xs, ys, num_epochs=2000, learning_rate=1e-3, batch_size=len(xs))
+    train_tensor_network_vector_to_matrix(model, xs, ys, num_epochs=5000, learning_rate=1e-2, batch_size=len(xs))
+    gold = ys[:1].cpu().numpy()[0]
+    predicted = model(xs[:1]).detach().cpu().numpy()[0]
+    print(gold.shape, predicted.shape)
+    print(gold.min(), gold.max(), predicted.min(), predicted.max())
+
+    clip = 1
+    print(f"clipping between {-clip} and {clip}")
+    gold = np.clip(gold, -clip, clip)
+    predicted = np.clip(predicted, -clip, clip)
+
+    print(np.histogram(gold))
+    print(np.histogram(predicted))
+
+    from PIL import Image
+    gold = (gold + clip) / 2 / clip
+    predicted = (predicted + clip) / 2 / clip
+    normalized_data = gold
+    grayscale_image = Image.fromarray((normalized_data * 255).astype(np.uint8))
+    grayscale_image.save('gold.png')
+    normalized_data = predicted
+    grayscale_image = Image.fromarray((normalized_data * 255).astype(np.uint8))
+    grayscale_image.save('predicted.png')
+
+    return
+    import matplotlib.pyplot as plt
+    plt.imshow(gold, cmap='gray', origin='upper')
+    plt.colorbar()
+    plt.savefig("gold.png")
+    plt.clf()
+    plt.imshow(predicted, cmap='gray', origin='upper')
+    plt.colorbar()
+    plt.savefig("predicted.png")
 
 
 # test_training() ; exit()
