@@ -1,7 +1,11 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+
+
+torch_device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class TensorNetworkBase(nn.Module):
@@ -49,7 +53,6 @@ class TensorNetworkThreeVectorsToScalar(TensorNetworkBase):
     forward = TensorNetworkBase.three_vectors_to_scalar
 
 
-
 def test():
     # Example usage
     d = 100  # Original input dimension
@@ -68,8 +71,6 @@ def test():
 
     output = model(input1, input2, input3)
     print(output.shape)
-
-
 
 
 def train_tensor_network_vector_to_matrix(model, vectors, matrices, num_epochs=100, learning_rate=1e-3, batch_size=32):
@@ -126,4 +127,58 @@ def test_training():
     train_tensor_network_vector_to_matrix(model, vectors, matrices, num_epochs=100, learning_rate=1e-3, batch_size=32)
 
 
-test_training()
+def create_dataset():
+    d = 4096 + 1 # 1 for the bias term.
+
+    x_collection = torch.load("relation_embeddings_prompt_templates.pt")
+    xs = []
+    ys = []
+    for i, r in enumerate(open("relationship_names", "r")):
+        if i >= 4:
+            break
+        r = r.strip()
+        print(r)
+
+        # [0] makes (1, 4096) (4096, )
+        x = x_collection[r].cpu().numpy()[0]
+        xs.append(x)
+
+        filename = "matrices/" + r.replace(' ', '_') + ".npy"
+        y = np.load(filename)
+        zeros = np.zeros((1, y.shape[1]), dtype=y.dtype)
+        y = np.vstack((y, zeros))
+        assert y.shape == (d, d)
+        ys.append(y)
+
+    xs = np.array(xs)
+    ys = np.array(ys)
+
+    ones = np.ones((xs.shape[0], 1), dtype=xs.dtype)
+    xs = np.hstack((xs, ones))
+    assert xs.shape[1] == d
+    print(xs.shape, xs.dtype)
+    print(ys.shape, ys.dtype)
+    np.save("xs.npy", xs)
+    np.save("ys.npy", ys)
+
+
+def training():
+    d = 4096 + 1 # 1 for the bias term.
+    k = 20
+    model = TensorNetworkVectorToMatrix(d, k).to(torch_device)
+    print(f"Total number of parameters: {count_parameters(model)}")
+
+    xs = np.load("xs.full.npy")
+    ys = np.load("ys.full.npy")
+    print("dataset read")
+    xs = torch.Tensor(xs).to(torch_device)
+    ys = torch.Tensor(ys).to(torch_device)
+
+    train_tensor_network_vector_to_matrix(model, xs, ys, num_epochs=2000, learning_rate=1e-3, batch_size=len(xs))
+
+
+# test_training() ; exit()
+
+# create_dataset() ; exit()
+
+training()
